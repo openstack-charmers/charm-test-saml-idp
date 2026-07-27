@@ -13,6 +13,8 @@ import os
 from socket import gethostname as get_unit_hostname
 from urllib.request import urlopen
 
+from lxml import etree
+
 from charmhelpers.contrib import ssl
 from charmhelpers.core.hookenv import unit_get, resource_get
 from charmhelpers.core.host import service_restart
@@ -26,18 +28,6 @@ from ops.main import main
 from utils import render_configs, retry_on_error
 
 logger = logging.getLogger(__name__)
-
-try:
-    from lxml import etree  # NOQA:F401
-except ImportError:
-    logger.warning(
-        'Failed to import the lxml module. Re-installing the charm venv')
-    retry_on_error()(apt_update)(fatal=True)
-    retry_on_error()(apt_install)(packages=['python3-pip'], fatal=True)
-    pip_cmd = ['pip3', 'install', '--upgrade', '--force-reinstall',
-               '--target=venv', '--requirement=requirements.txt']
-    retry_on_error()(subprocess.check_call)(pip_cmd)
-    from lxml import etree  # NOQA:F401
 
 
 class TestSamlIdpCharm(CharmBase):
