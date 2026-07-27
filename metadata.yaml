@@ -8,9 +8,9 @@ description: |
   This is NOT recommended to be used in production. It should be used only
   for testing purposes.
 series:
-  - bionic
   - focal
-  - groovy
+  - jammy
+  - noble
 resources:
   sp-metadata:
     type: file
