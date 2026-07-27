@@ -1,0 +1,70 @@
+name: Deploy and Validate
+
+on:
+  workflow_run:
+    workflows: ["Build Charm"]
+    types: [completed]
+
+jobs:
+  deploy-and-validate:
+    name: Deploy charm and validate status
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Download charm artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-saml-idp-charm
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Setup LXD
+        uses: canonical/setup-lxd@v0.1.1
+        with:
+          channel: latest/stable
+
+      - name: Install juju 3.6
+        run: sudo snap install juju --classic --channel=3.6/stable
+
+      - name: Bootstrap juju controller
+        run: juju bootstrap localhost test-controller
+
+      - name: Add model and deploy charm
+        run: |
+          juju add-model test-saml-idp
+          juju deploy ./test-saml-idp_*.charm test-saml-idp
+
+      - name: Validate juju status is not in error state
+        run: |
+          set -euo pipefail
+          # Poll the status for up to 10 minutes. The charm stays in a
+          # non-error state (maintenance/blocked) without the sp-metadata
+          # resource, so we only need to assert that no application or unit
+          # reports an "error" workload status.
+          for i in $(seq 1 20); do
+            juju status
+            if juju status --format=json | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          errors = []
+          for name, app in (data.get("applications") or {}).items():
+              app_status = (app.get("status") or {}).get("status", "")
+              if app_status == "error":
+                  errors.append(f"application {name!r} is in error state")
+              for unit_name, unit in (app.get("units") or {}).items():
+                  ws = (unit.get("workload-status") or {}).get("status", "")
+                  if ws == "error":
+                      errors.append(f"unit {unit_name!r} is in error state")
+          if errors:
+              print("\n".join(errors))
+              sys.exit(1)
+          sys.exit(0)
+          '; then
+              echo "No error states detected."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Timed out waiting for a non-error status."
+          juju status --format=yaml
+          exit 1

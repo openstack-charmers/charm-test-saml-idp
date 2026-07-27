@@ -1,0 +1,17 @@
+# Copyright 2021 Ionut Balutoiu
+# See LICENSE file for licensing details.
+#
+# The name, summary and description are provided by metadata.yaml.
+# The configuration options are provided by config.yaml.
+type: charm
+platforms:
+  ubuntu@20.04:amd64:
+  ubuntu@22.04:amd64:
+  ubuntu@24.04:amd64:
+parts:
+  charm:
+    plugin: charm
+    source: .
+    charm-entrypoint: src/charm.py
+    charm-requirements:
+      - requirements.txt
