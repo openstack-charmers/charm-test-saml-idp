@@ -4,19 +4,25 @@ on:
   workflow_run:
     workflows: ["Build Charm"]
     types: [completed]
+  workflow_call:
+    inputs:
+      run-id:
+        required: false
+        type: string
+        description: "Run ID of the build workflow to download artifacts from"
 
 jobs:
   deploy-and-validate:
     name: Deploy charm and validate status
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Download charm artifact
         uses: actions/download-artifact@v4
         with:
           name: test-saml-idp-charm
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
 
       - name: Setup LXD
         uses: canonical/setup-lxd@v0.1.1
@@ -32,7 +38,16 @@ jobs:
       - name: Add model and deploy charm
         run: |
           juju add-model test-saml-idp
-          juju deploy ./test-saml-idp_*.charm test-saml-idp
+          for charm_file in ./test-saml-idp_*.charm; do
+            ubuntu_ver=$(echo "$charm_file" | sed 's/.*_ubuntu@//' | sed 's/-.*//')
+            case "$ubuntu_ver" in
+              20.04) codename=focal ;;
+              22.04) codename=jammy ;;
+              24.04) codename=noble ;;
+              *)     codename=$(echo "$ubuntu_ver" | tr '.' '_') ;;
+            esac
+            juju deploy "$charm_file" "test-saml-idp-$codename"
+          done
 
       - name: Validate juju status is not in error state
         run: |
