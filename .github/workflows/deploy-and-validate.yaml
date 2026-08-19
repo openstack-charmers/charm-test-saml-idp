@@ -17,6 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download charm artifact
         uses: actions/download-artifact@v4
         with:
@@ -57,39 +60,7 @@ jobs:
           # application or unit reports an "error" status.
           for i in $(seq 1 20); do
             juju status
-            if juju status --format=json | python3 -c '
-          import json, sys
-
-          data = json.load(sys.stdin)
-          errors = []
-          pending = []
-
-          for name, app in (data.get("applications") or {}).items():
-              app_status = (app.get("status") or {}).get("status", "")
-              if app_status == "error":
-                  errors.append(f"application {name!r} is in error state")
-              for unit_name, unit in (app.get("units") or {}).items():
-                  agent_status = (unit.get("agent-status") or {}).get("status", "")
-                  ws = (unit.get("workload-status") or {}).get("status", "")
-                  if agent_status == "error":
-                      errors.append(f"unit {unit_name!r} agent is in error state")
-                  if ws == "error":
-                      errors.append(f"unit {unit_name!r} is in error state")
-                  if agent_status != "idle":
-                      pending.append(
-                          f"unit {unit_name!r} agent status is {agent_status!r}"
-                      )
-
-          if errors:
-              print("\n".join(errors))
-              sys.exit(1)
-          if pending:
-              print("\n".join(pending))
-              sys.exit(2)
-
-          print("All units settled with no error states.")
-          sys.exit(0)
-          '; then
+            if juju status --format=json | python3 scripts/check-juju-status.py; then
               echo "No error states detected."
               exit 0
             fi
