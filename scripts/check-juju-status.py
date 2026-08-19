@@ -14,18 +14,24 @@ import json
 import sys
 
 
+def status_of(block):
+    if not isinstance(block, dict):
+        return ""
+    return block.get("current", "")
+
+
 def check(data):
     errors = []
     pending = []
 
     for name, app in (data.get("applications") or {}).items():
-        app_status = (app.get("status") or {}).get("status", "")
+        app_status = status_of(app.get("application-status"))
         if app_status == "error":
             errors.append(f"application {name!r} is in error state")
 
         for unit_name, unit in (app.get("units") or {}).items():
-            agent_status = (unit.get("agent-status") or {}).get("status", "")
-            ws = (unit.get("workload-status") or {}).get("status", "")
+            agent_status = status_of(unit.get("juju-status"))
+            ws = status_of(unit.get("workload-status"))
             if agent_status == "error":
                 errors.append(f"unit {unit_name!r} agent is in error state")
             if ws == "error":
