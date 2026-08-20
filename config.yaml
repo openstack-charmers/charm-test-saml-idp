@@ -4,7 +4,7 @@
 options:
   simple-saml-php-version:
     type: string
-    default: '1.18.8'
+    default: '1.19.5'
     description: The release version of the SimpleSAMLphp.
   admin-password:
     type: string
